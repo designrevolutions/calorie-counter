@@ -10,8 +10,14 @@
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon.svg">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=3">
   <script>
+    // iOS browsers (Safari, Chrome, Brave all use WebKit) auto-zoom into focused fields and can stay
+    // zoomed, leaving the page scrollable sideways. maximum-scale stops that auto-zoom; iOS still
+    // lets people pinch-zoom. Not applied on Android, where it would block pinch-zoom.
+    if (/iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+      document.querySelector('meta[name=viewport]').setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover');
+    }
     // Apply the saved theme before first paint to avoid a flash.
     try {
       var s = JSON.parse(localStorage.getItem('tally:v1') || '{}');
@@ -317,17 +323,11 @@
 
       <div class="field">
         <span class="label">Your data</span>
-        <p class="hint">Everything lives in this browser's local storage. Clearing site data will erase it, so export a backup now and then.</p>
-        <div class="stack">
-          <button type="button" class="btn btn--ghost btn--block" id="export-json">Download backup (.json)</button>
-          <button type="button" class="btn btn--ghost btn--block" id="export-csv">Export food log (.csv)</button>
-          <label class="btn btn--ghost btn--block file-btn">
-            Restore from backup…
-            <input type="file" id="import-json" accept="application/json,.json">
-          </label>
-          <button type="button" class="btn btn--ghost btn--block" id="load-samples">Add sample recipes</button>
-          <button type="button" class="btn btn--danger-ghost btn--block" id="erase-all">Erase all data</button>
-        </div>
+        <button type="button" class="nav-row" id="open-data">
+          <span class="nav-row__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg></span>
+          <span class="nav-row__text"><strong>Import &amp; export</strong><span id="backup-status">Recipes, food log and backups</span></span>
+          <svg class="nav-row__chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
       </div>
 
       <footer class="sheet__foot">
@@ -336,6 +336,123 @@
         <button class="btn btn--primary" value="save">Done</button>
       </footer>
     </form>
+  </dialog>
+
+  <!-- ============ Dialog: import & export ============ -->
+  <dialog class="sheet" id="dlg-data" aria-labelledby="dlg-data-title">
+    <div class="sheet__inner">
+      <header class="sheet__head">
+        <button class="icon-btn" type="button" id="data-back" aria-label="Back to settings">
+          <svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>
+        </button>
+        <h2 id="dlg-data-title" tabindex="-1" autofocus>Import &amp; export</h2>
+        <button class="icon-btn" type="button" data-close aria-label="Close">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+      <p class="hint">Everything lives in this browser only. Clearing site data erases it, and it doesn't sync between devices. Use these to back up, move to another device, or work in a spreadsheet.</p>
+
+      <section class="data-group" aria-labelledby="dg-recipes">
+        <h3 id="dg-recipes">Recipes &amp; exercises</h3>
+        <button type="button" class="data-row" id="import-recipes">
+          <strong>Import recipes</strong><span>From a spreadsheet (.csv), text, or another Tally export. Duplicates are detected.</span>
+        </button>
+        <button type="button" class="data-row" id="export-recipes">
+          <strong>Export recipes (.csv)</strong><span>Opens in Excel or Google Sheets, and imports back here or on another device.</span>
+        </button>
+        <button type="button" class="data-row" id="copy-recipes">
+          <strong>Copy recipes</strong><span>Paste straight into a spreadsheet, a note, or a message.</span>
+        </button>
+      </section>
+
+      <section class="data-group" aria-labelledby="dg-log">
+        <h3 id="dg-log">Food log</h3>
+        <button type="button" class="data-row" id="export-csv">
+          <strong>Export every entry (.csv)</strong><span>One row per item logged: date, meal, item, calories.</span>
+        </button>
+        <button type="button" class="data-row" id="export-daily">
+          <strong>Export daily totals (.csv)</strong><span>One row per day: food, exercise, net and goal. Good for charts.</span>
+        </button>
+      </section>
+
+      <section class="data-group" aria-labelledby="dg-backup">
+        <h3 id="dg-backup">Full backup</h3>
+        <button type="button" class="data-row" id="export-json">
+          <strong>Download backup (.json)</strong><span id="last-backup">Everything: recipes, exercises, log and settings.</span>
+        </button>
+        <label class="data-row file-btn">
+          <strong>Restore or merge a backup</strong><span>Merge combines it with what's here; replace swaps everything.</span>
+          <input type="file" id="import-json" accept="application/json,.json">
+        </label>
+        <div class="restore-confirm" id="restore-confirm" hidden>
+          <p id="restore-summary"></p>
+          <div class="restore-confirm__actions">
+            <button type="button" class="btn btn--primary btn--sm" id="restore-merge">Merge</button>
+            <button type="button" class="btn btn--ghost btn--sm" id="restore-replace">Replace everything</button>
+            <button type="button" class="btn btn--ghost btn--sm" id="restore-cancel">Cancel</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="data-group" aria-labelledby="dg-other">
+        <h3 id="dg-other">Other</h3>
+        <button type="button" class="data-row" id="load-samples">
+          <strong>Add sample recipes &amp; exercises</strong><span>Skips any you already have.</span>
+        </button>
+        <button type="button" class="data-row data-row--danger" id="erase-all">
+          <strong>Erase all data</strong><span>Removes everything from this browser. Can't be undone.</span>
+        </button>
+      </section>
+      <p class="subtle" id="storage-usage"></p>
+    </div>
+  </dialog>
+
+  <!-- ============ Dialog: import recipes ============ -->
+  <dialog class="sheet sheet--wide" id="dlg-import" aria-labelledby="dlg-import-title">
+    <div class="sheet__inner">
+      <header class="sheet__head">
+        <h2 id="dlg-import-title">Import recipes</h2>
+        <button class="icon-btn" type="button" data-close aria-label="Close">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+      <p class="hint">Use a <strong>.csv</strong> or text file with an item column and a calories column. A <em>type</em> column (food or exercise) and a <em>notes</em> column are optional. Tally's own recipe exports and backups also work.</p>
+      <div class="import-src">
+        <label class="btn btn--ghost btn--sm file-btn">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5M5 21h14"/></svg>
+          Choose file…
+          <input type="file" id="import-file" accept=".csv,.tsv,.txt,.json,text/csv,text/plain,application/json">
+        </label>
+        <span class="subtle">or paste below</span>
+      </div>
+      <div class="field">
+        <label for="import-text" class="sr-only">Text to import</label>
+        <textarea id="import-text" rows="5" spellcheck="false" placeholder="Porridge with banana, 340&#10;Flat white, 120&#10;Run&#9;350&#9;exercise"></textarea>
+      </div>
+      <div class="import-opts" id="import-opts" hidden>
+        <div class="field">
+          <span class="label">Rows without a type are</span>
+          <div class="segmented" role="radiogroup" aria-label="Rows without a type are">
+            <label><input type="radio" name="import-kind" value="food" checked><span>Food</span></label>
+            <label><input type="radio" name="import-kind" value="exercise"><span>Exercise</span></label>
+          </div>
+        </div>
+        <div class="field">
+          <label for="import-dupes">If it's already saved</label>
+          <label class="select select--block"><select id="import-dupes">
+            <option value="skip">Skip it</option>
+            <option value="update">Update its calories</option>
+            <option value="add">Add it again</option>
+          </select></label>
+        </div>
+      </div>
+      <div id="import-preview" class="import-preview" aria-live="polite"></div>
+      <footer class="sheet__foot">
+        <button type="button" class="btn btn--ghost" data-close>Cancel</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn--primary" id="import-go" disabled>Import</button>
+      </footer>
+    </div>
   </dialog>
 
   <!-- ============ Dialog: reports ============ -->
@@ -375,6 +492,6 @@
     </symbol>
   </svg>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>

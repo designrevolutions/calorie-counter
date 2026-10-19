@@ -1174,7 +1174,10 @@
   }
 
   $('#export-json').addEventListener('click', () => {
+    state.settings.lastBackup = Date.now();
+    save();
     download(`tally-backup-${dateKey()}.json`, JSON.stringify({ app: 'tally', exportedAt: new Date().toISOString(), ...state }, null, 2), 'application/json');
+    renderDataStatus();
     toast('Backup downloaded');
   });
 
@@ -1189,26 +1192,317 @@
     toast('Food log exported');
   });
 
+  /* ---------- Full backup: restore (replace) or merge ---------- */
+  const restoreBox = $('#restore-confirm');
+  let pendingBackup = null;
+
   $('#import-json').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     e.target.value = '';
     if (!file) return;
     try {
-      const data = JSON.parse(await file.text());
+      const data = JSON.parse((await file.text()).replace(/^﻿/, ''));
       if (!data || (!Array.isArray(data.recipes) && !data.log)) throw new Error('shape');
-      const incoming = normalise(data);
-      const ok = confirm(`Restore this backup?\n\n${incoming.recipes.length} recipes and ${Object.keys(incoming.log).length} logged days will replace what's in this browser now.`);
-      if (!ok) return;
-      state = incoming;
-      save();
-      applyTheme();
-      renderAll();
-      closeDialog(dlgSettings);
-      toast('Backup restored');
+      pendingBackup = normalise(data);
+      const days = Object.keys(pendingBackup.log).length;
+      const when = data.exportedAt ? ` from ${new Date(data.exportedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}` : '';
+      $('#restore-summary').textContent = `This backup${when} has ${pendingBackup.recipes.length} recipes/exercises and ${days} logged day${days === 1 ? '' : 's'}. Merge adds anything missing here; replace swaps everything for the backup.`;
+      restoreBox.hidden = false;
+      $('#restore-merge').focus();
     } catch (err) {
       toast('That file isn’t a valid Tally backup.');
     }
   });
+
+  /** Add recipes and log entries from `incoming` that aren't already here. Settings stay as they are. */
+  function mergeIn(incoming) {
+    const ids = new Set(state.recipes.map((r) => r.id));
+    const names = new Set(state.recipes.map((r) => kindOf(r) + '|' + splitText(r.text).title.toLowerCase()));
+    let recipes = 0, entries = 0;
+    for (const r of incoming.recipes) {
+      const key = kindOf(r) + '|' + splitText(r.text).title.toLowerCase();
+      if (ids.has(r.id) || names.has(key)) continue;
+      state.recipes.push(r);
+      ids.add(r.id); names.add(key);
+      recipes++;
+    }
+    for (const [day, list] of Object.entries(incoming.log)) {
+      const mine = (state.log[day] = state.log[day] || []);
+      const have = new Set(mine.map((e) => e.id));
+      for (const e of list) if (!have.has(e.id)) { mine.push(e); entries++; }
+      mine.sort((a, b) => a.at - b.at);
+    }
+    return { recipes, entries };
+  }
+
+  $('#restore-merge').addEventListener('click', () => {
+    if (!pendingBackup) return;
+    const { recipes, entries } = mergeIn(pendingBackup);
+    pendingBackup = null;
+    restoreBox.hidden = true;
+    save();
+    renderAll();
+    renderDataStatus();
+    toast(recipes || entries ? `Merged ${recipes} recipe${recipes === 1 ? '' : 's'} and ${entries} log entr${entries === 1 ? 'y' : 'ies'}` : 'Nothing new. You already have everything in that backup.');
+  });
+  $('#restore-replace').addEventListener('click', () => {
+    if (!pendingBackup) return;
+    if (!confirm('Replace everything in this browser with the backup? Anything not in the backup will be lost.')) return;
+    state = pendingBackup;
+    pendingBackup = null;
+    restoreBox.hidden = true;
+    save();
+    applyTheme();
+    renderAll();
+    renderDataStatus();
+    toast('Backup restored');
+  });
+  $('#restore-cancel').addEventListener('click', () => { pendingBackup = null; restoreBox.hidden = true; });
+
+  /* ---------- Import & export page ---------- */
+  const dlgData = $('#dlg-data');
+  const ago = (t) => {
+    const days = Math.round((parseKey(dateKey()) - parseKey(dateKey(new Date(t)))) / 864e5);
+    return days <= 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`;
+  };
+  function renderDataStatus() {
+    const t = state.settings.lastBackup;
+    $('#last-backup').textContent = t ? `Everything: recipes, exercises, log and settings. Last backup ${ago(t)}.` : 'Everything: recipes, exercises, log and settings. No backup yet.';
+    $('#backup-status').textContent = t ? `Last backup ${ago(t)}` : 'Recipes, food log and backups. No backup yet.';
+    const bytes = new Blob([localStorage.getItem(STORAGE_KEY) || '']).size;
+    const days = Object.keys(state.log).length;
+    $('#storage-usage').textContent = `${state.recipes.length} saved items · ${days} day${days === 1 ? '' : 's'} logged · ${bytes < 1024 ? bytes + ' B' : (bytes / 1024).toFixed(1) + ' KB'} used`;
+  }
+  function openData() {
+    restoreBox.hidden = true;
+    pendingBackup = null;
+    renderDataStatus();
+    if (dlgSettings.open) dlgSettings.close();
+    openDialog(dlgData);
+  }
+  $('#open-data').addEventListener('click', openData);
+  $('#data-back').addEventListener('click', () => { dlgData.close(); openSettings(false); });
+
+  const csvCell = (s) => (/[",\n\r]/.test(String(s)) ? `"${String(s).replace(/"/g, '""')}"` : String(s));
+  const sortedForExport = () => state.recipes.slice().sort((a, b) => kindOf(a).localeCompare(kindOf(b)) || a.text.localeCompare(b.text));
+
+  $('#export-recipes').addEventListener('click', () => {
+    if (!state.recipes.length) { toast('No recipes to export yet.'); return; }
+    const rows = [['type', 'item', 'calories', 'notes'].join(',')];
+    for (const r of sortedForExport()) {
+      const { title, notes } = splitText(r.text);
+      rows.push([kindOf(r), csvCell(title), r.kcal, csvCell(notes)].join(','));
+    }
+    download(`tally-recipes-${dateKey()}.csv`, '﻿' + rows.join('\r\n'), 'text/csv');
+    toast(`Exported ${state.recipes.length} items`);
+  });
+
+  $('#copy-recipes').addEventListener('click', async () => {
+    if (!state.recipes.length) { toast('No recipes to copy yet.'); return; }
+    const tsvCell = (s) => (/[\t\n"]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
+    const text = ['Item\tCalories\tType', ...sortedForExport().map((r) => `${tsvCell(r.text)}\t${r.kcal}\t${kindOf(r)}`)].join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      toast(`Copied ${state.recipes.length} items. Paste into a spreadsheet or note.`);
+    } catch (_) {
+      download(`tally-recipes-${dateKey()}.txt`, text, 'text/plain');
+      toast('Clipboard blocked, so it was downloaded as a text file instead.');
+    }
+  });
+
+  $('#export-daily').addEventListener('click', () => {
+    const days = Object.keys(state.log).sort();
+    if (!days.length) { toast('Nothing logged yet to export.'); return; }
+    const goal = state.settings.goal;
+    const rows = [['date', 'weekday', 'food_kcal', 'exercise_kcal', 'net_kcal', 'goal_kcal', 'within_goal'].join(',')];
+    for (const d of days) {
+      const net = dayNet(d);
+      rows.push([d, parseKey(d).toLocaleDateString('en-GB', { weekday: 'short' }), dayFood(d), dayBurn(d), net, goal, net <= goal ? 'yes' : 'no'].join(','));
+    }
+    download(`tally-daily-${dateKey()}.csv`, rows.join('\r\n'), 'text/csv');
+    toast(`Exported ${days.length} day${days.length === 1 ? '' : 's'}`);
+  });
+
+  /* ---------- Import recipes ---------- */
+  const dlgImport = $('#dlg-import');
+  const importText = $('#import-text');
+  const importPreview = $('#import-preview');
+  const importGo = $('#import-go');
+  let importRows = [];
+
+  const ITEM_COL = /^(item|name|food|recipe|title|exercise|activity|meal|description)\b/i;
+  const KCAL_COL = /(cal|kcal|energy|burn)/i;
+  const TYPE_COL = /^(type|kind|category)\b/i;
+  const NOTES_COL = /^(notes?|details?|ingredients?)\b/i;
+  const parseKind = (v) => (/exer|workout|activ|burn|sport/i.test(v || '') ? EXERCISE : /food|meal|recipe|drink|snack/i.test(v || '') ? 'food' : null);
+
+  /** Parse delimited text (comma, semicolon or tab), honouring quoted cells with commas/newlines. */
+  function parseDelimited(text, delim) {
+    const rows = [];
+    let row = [], cell = '', quoted = false;
+    text = text.replace(/\r\n?/g, '\n');
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (quoted) {
+        if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+        else if (c === '"') quoted = false;
+        else cell += c;
+      } else if (c === '"' && cell.trim() === '') { quoted = true; cell = ''; }
+      else if (c === delim) { row.push(cell); cell = ''; }
+      else if (c === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; }
+      else cell += c;
+    }
+    row.push(cell);
+    rows.push(row);
+    return rows.filter((r) => r.some((c) => c.trim()));
+  }
+
+  /** Turn a file or pasted text into [{ text, kcal, kind }] candidates. */
+  function parseImport(raw) {
+    const text = raw.replace(/^﻿/, '').trim();
+    if (!text) return [];
+    if (/^[[{]/.test(text)) {
+      try {
+        const data = JSON.parse(text);
+        const list = Array.isArray(data) ? data : data.recipes || [];
+        return list.map((r) => ({
+          text: String(r.text || [r.item || r.name || '', r.notes || ''].filter(Boolean).join('\n')).trim(),
+          kcal: parseKcal(r.kcal ?? r.calories),
+          kind: parseKind(r.kind || r.type),
+        }));
+      } catch (_) { /* not JSON after all, fall through */ }
+    }
+    const firstLine = text.split('\n')[0];
+    const cells = (d) => firstLine.split(d).map((c) => c.trim().replace(/^"|"$/g, ''));
+    const delim = firstLine.includes('\t') ? '\t' : cells(';').length > cells(',').length ? ';' : ',';
+    const head = cells(delim);
+    const hasHeader = head.some((c) => ITEM_COL.test(c)) && head.some((c) => KCAL_COL.test(c));
+
+    if (hasHeader) {
+      const rows = parseDelimited(text, delim);
+      const h = rows.shift().map((c) => c.trim());
+      const iItem = h.findIndex((c) => ITEM_COL.test(c));
+      const iKcal = h.findIndex((c, i) => i !== iItem && KCAL_COL.test(c));
+      const iType = h.findIndex((c) => TYPE_COL.test(c));
+      const iNotes = h.findIndex((c) => NOTES_COL.test(c));
+      return rows.map((c) => ({
+        text: [c[iItem], iNotes >= 0 ? c[iNotes] : ''].map((s) => (s || '').trim()).filter(Boolean).join('\n'),
+        kcal: parseKcal(c[iKcal]),
+        kind: iType >= 0 ? parseKind(c[iType]) : null,
+      }));
+    }
+    if (delim === '\t') {
+      return parseDelimited(text, '\t').map((c) => ({ text: (c[0] || '').trim(), kcal: parseKcal(c[1]), kind: parseKind(c[2]) }));
+    }
+    // Free text: "Porridge, 340" / "Gravy: 60 kcal" / "Run - 350 exercise". Lines without a number become notes.
+    const out = [];
+    for (const line of text.split('\n').map((l) => l.trim()).filter(Boolean)) {
+      const typed = line.match(/^(.*?)[\s,;|]+(exercise|food)\s*$/i);
+      const body = typed ? typed[1] : line;
+      const m = body.match(LINE_RE);
+      if (m) out.push({ text: m[1].replace(/^[-•*\d.)\s]+(?=\D)/, '').trim(), kcal: parseKcal(m[2]), kind: typed ? parseKind(typed[2]) : null });
+      else if (out.length) out[out.length - 1].text += '\n' + line;
+      else out.push({ text: line, kcal: null, kind: null });
+    }
+    return out;
+  }
+
+  function classifyImport() {
+    const fallback = $('input[name="import-kind"]:checked').value;
+    const dupes = $('#import-dupes').value;
+    const existing = new Map(state.recipes.map((r) => [kindOf(r) + '|' + splitText(r.text).title.toLowerCase(), r]));
+    const seen = new Set();
+    return importRows.map((r) => {
+      const kind = r.kind || fallback;
+      const title = splitText(r.text || '').title;
+      const key = kind + '|' + title.toLowerCase();
+      let status = 'new';
+      if (!title || r.kcal === null) status = 'bad';
+      else if (existing.has(key) || seen.has(key)) status = dupes === 'add' ? 'new' : dupes === 'update' && existing.has(key) ? 'update' : 'dupe';
+      seen.add(key);
+      return { ...r, kind, title, key, status, match: existing.get(key) };
+    });
+  }
+
+  function renderImport() {
+    if (!importRows.length) {
+      importPreview.innerHTML = '';
+      $('#import-opts').hidden = true;
+      importGo.disabled = true;
+      importGo.textContent = 'Import';
+      return;
+    }
+    $('#import-opts').hidden = false;
+    const rows = classifyImport();
+    const n = (s) => rows.filter((r) => r.status === s).length;
+    const add = n('new'), upd = n('update'), dupe = n('dupe'), bad = n('bad');
+    const parts = [add && `${add} new`, upd && `${upd} to update`, dupe && `${dupe} already saved`, bad && `${bad} skipped (missing name or calories)`].filter(Boolean);
+    const label = { new: '<span class="badge">New</span>', update: '<span class="badge">Update</span>', dupe: '<span class="badge badge--dupe">Saved</span>', bad: '<span class="badge badge--bad">Skip</span>' };
+    importPreview.innerHTML = `<p class="import-summary">${parts.join(' · ') || 'Nothing to import'}</p>
+      <div class="import-table"><table>
+        <thead><tr><th>Item</th><th class="num">kcal</th><th></th></tr></thead>
+        <tbody>${rows.slice(0, 300).map((r) => `<tr>
+          <td title="${esc(r.text || '')}">${r.kind === EXERCISE ? '<span class="badge badge--ex">Ex</span>' : ''}${esc(r.title || '—')}</td>
+          <td class="num">${r.kcal === null ? '—' : fmt(r.kcal)}</td>
+          <td>${label[r.status]}</td></tr>`).join('')}</tbody>
+      </table></div>${rows.length > 300 ? `<p class="hint">Showing the first 300 of ${rows.length} rows.</p>` : ''}`;
+    const count = add + upd;
+    importGo.disabled = !count;
+    importGo.textContent = count ? `Import ${count}` : 'Import';
+  }
+
+  let importTimer;
+  importText.addEventListener('input', () => {
+    clearTimeout(importTimer);
+    importTimer = setTimeout(() => { importRows = parseImport(importText.value); renderImport(); }, 150);
+  });
+  $('#import-file').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 5e6) { toast('That file is too large to import.'); return; }
+    importText.value = (await file.text()).replace(/^﻿/, '');
+    importRows = parseImport(importText.value);
+    renderImport();
+    if (!importRows.length) toast('Couldn’t find any rows in that file.');
+  });
+  $$('input[name="import-kind"]').forEach((i) => i.addEventListener('change', renderImport));
+  $('#import-dupes').addEventListener('change', renderImport);
+
+  importGo.addEventListener('click', () => {
+    const rows = classifyImport();
+    const now = Date.now();
+    let added = 0, updated = 0;
+    const firstKind = rows.find((r) => r.status === 'new' || r.status === 'update')?.kind;
+    rows.forEach((r, i) => {
+      if (r.status === 'update' && r.match) { r.match.kcal = r.kcal; if (r.text.includes('\n')) r.match.text = r.text; updated++; }
+      else if (r.status === 'new') {
+        const rec = { id: uid(), kind: r.kind, text: r.text, kcal: r.kcal, uses: 0, lastUsed: 0, createdAt: now + i };
+        state.recipes.push(rec);
+        ui.newRecipeIds.add(rec.id);
+        added++;
+      }
+    });
+    if (!save()) return;
+    if (firstKind && firstKind !== ui.tab) { ui.tab = firstKind; renderTabs(); }
+    ui.search = '';
+    els.search.value = '';
+    renderRecipes();
+    renderLog();
+    closeDialog(dlgImport);
+    toast([added && `Imported ${added}`, updated && `updated ${updated}`].filter(Boolean).join(', ') || 'Nothing imported');
+  });
+
+  function openImport() {
+    importText.value = '';
+    importRows = [];
+    $('#import-dupes').value = 'skip';
+    $$('input[name="import-kind"]').forEach((i) => (i.checked = i.value === ui.tab));
+    renderImport();
+    if (dlgData.open) dlgData.close();
+    openDialog(dlgImport);
+  }
+  $('#import-recipes').addEventListener('click', openImport);
 
   function addSamples(kind = ui.tab) {
     const have = new Set(state.recipes.filter((r) => kindOf(r) === kind).map((r) => splitText(r.text).title.toLowerCase()));
@@ -1232,7 +1526,7 @@
       },
     });
   }
-  $('#load-samples').addEventListener('click', () => { addSamples('food'); addSamples(EXERCISE); closeDialog(dlgSettings); });
+  $('#load-samples').addEventListener('click', () => { addSamples('food'); addSamples(EXERCISE); closeDialog($('#dlg-data')); });
 
   /* =========================================================
      Reports (week / month)
@@ -1380,7 +1674,7 @@
     ui.shown = { eaten: 0, remaining: state.settings.goal };
     applyTheme();
     renderAll();
-    closeDialog(dlgSettings);
+    closeDialog($('#dlg-data'));
     toast('All data erased');
   });
 
@@ -1407,7 +1701,7 @@
   });
   $('#open-settings').addEventListener('click', () => openSettings(false));
   $('#edit-goal').addEventListener('click', () => openSettings(true));
-  $('#footer-backup').addEventListener('click', () => openSettings(false));
+  $('#footer-backup').addEventListener('click', () => openData());
   $('#open-new-recipes').addEventListener('click', () => openNewDialog());
   $('#open-quick-add').addEventListener('click', openQuickDialog);
 
@@ -1485,6 +1779,33 @@
   // Offline support when served over http(s)
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+
+  // Open the app with ?debug to outline anything wider than the screen and show viewport details.
+  // Useful for tracking down sideways scrolling on a specific phone/browser.
+  function debugWidth() {
+    $$('.debug-wide').forEach((e) => e.classList.remove('debug-wide'));
+    const vw = document.documentElement.clientWidth;
+    const bad = $$('body *').filter((e) => {
+      if (e.closest('dialog:not([open]), .debug-panel, .sr-only')) return false;
+      const r = e.getBoundingClientRect();
+      return r.width > 0 && (r.right > vw + 0.5 || r.left < -0.5);
+    });
+    bad.forEach((e) => e.classList.add('debug-wide'));
+    const vv = window.visualViewport;
+    const panel = $('.debug-panel') || document.body.appendChild(Object.assign(document.createElement('div'), { className: 'debug-panel' }));
+    panel.textContent = [
+      `innerWidth ${innerWidth} · clientWidth ${vw} · scrollWidth ${document.documentElement.scrollWidth}`,
+      `visualViewport ${vv ? Math.round(vv.width) + ' @ scale ' + vv.scale.toFixed(2) : 'n/a'} · dpr ${devicePixelRatio}`,
+      `font-size ${getComputedStyle(document.body).fontSize}`,
+      navigator.userAgent,
+      bad.length ? `${bad.length} element(s) past the edge:\n` + bad.slice(0, 15).map((e) => `  ${e.tagName.toLowerCase()}.${String(e.className.baseVal ?? e.className).replace(/\s+/g, '.')} → right ${Math.round(e.getBoundingClientRect().right)}`).join('\n') : 'Nothing past the edge ✓',
+    ].join('\n');
+  }
+  if (/[?&]debug\b/.test(location.search)) {
+    setTimeout(debugWidth, 600);
+    window.addEventListener('resize', () => setTimeout(debugWidth, 200));
+    window.visualViewport?.addEventListener('resize', () => setTimeout(debugWidth, 200));
   }
 
   applyTheme();

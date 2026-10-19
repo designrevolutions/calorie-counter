@@ -102,6 +102,8 @@
 html { -webkit-text-size-adjust: 100%; }
 /* Guard against any sideways scroll on phones (iOS Safari is unforgiving). */
 html, body { overflow-x: hidden; max-width: 100%; }
+body { position: relative; }
+.app { overflow-x: clip; }
 body {
   margin: 0;
   background: var(--bg);
@@ -483,7 +485,7 @@ dialog.sheet.is-closing::backdrop { animation: fade .2s ease reverse forwards; }
   justify-self: center; margin: -8px 0 -6px;
 }
 @media (min-width: 640px) { .sheet__inner::before { display: none; } }
-.sheet__foot { display: flex; align-items: center; gap: 8px; padding-top: 4px; position: sticky; bottom: 0; }
+.sheet__foot { display: flex; align-items: center; gap: 8px; padding: 10px 0 2px; position: sticky; bottom: 0; z-index: 2; background: var(--surface); box-shadow: 0 -12px 12px -12px rgb(0 0 0 / .18); }
 .spacer { flex: 1; }
 
 .field { display: grid; gap: 6px; }
@@ -589,6 +591,59 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
 .meal-row__val { color: var(--ink-2); font-variant-numeric: tabular-nums; text-align: right; min-width: 8ch; }
 .report-note { font-size: 12px; color: var(--ink-3); }
 .report-empty { padding: 28px 12px; text-align: center; color: var(--ink-3); border: 1.5px dashed var(--line-strong); border-radius: var(--radius-sm); }
+
+/* ---------- import & export ---------- */
+.nav-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  padding: 12px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface);
+  transition: background .15s;
+}
+.nav-row:hover { background: var(--surface-2); }
+.nav-row__icon { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: 10px; background: var(--accent-soft); color: var(--accent-soft-ink); }
+.nav-row__icon svg, .nav-row__chev { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.nav-row__text { flex: 1; min-width: 0; display: grid; }
+.nav-row__text span { font-size: 12.5px; color: var(--ink-3); }
+.nav-row__chev { flex: none; color: var(--ink-3); }
+.sheet__head h2 { flex: 1; min-width: 0; }
+#data-back { margin-left: -8px; }
+
+.data-group { display: grid; gap: 2px; }
+.data-group h3 { font-size: 12px; font-weight: 650; color: var(--ink-3); text-transform: uppercase; letter-spacing: .06em; margin: 0 0 6px; }
+.data-row {
+  display: grid; gap: 1px; width: 100%; text-align: left; padding: 10px 12px; margin: 0 -12px; width: calc(100% + 24px);
+  border: 0; background: none; border-radius: var(--radius-xs); cursor: pointer; transition: background .15s;
+}
+.data-row:hover, .data-row:focus-within { background: var(--surface-2); }
+.data-row strong { font-size: 14.5px; font-weight: 600; }
+.data-row span { font-size: 12.5px; color: var(--ink-3); }
+.data-row--danger strong { color: var(--danger); }
+.data-row.file-btn { position: relative; overflow: hidden; }
+.restore-confirm { margin-top: 6px; padding: 12px; border-radius: var(--radius-sm); background: var(--surface-2); display: grid; gap: 10px; font-size: 13.5px; }
+.restore-confirm__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.import-src { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.import-src .file-btn { position: relative; overflow: hidden; }
+#import-text { font: 500 13.5px/1.5 ui-monospace, "Cascadia Code", Menlo, monospace; min-height: 110px; }
+.import-opts { display: grid; gap: 12px; }
+@media (min-width: 560px) { .import-opts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.select--block select { width: 100%; height: 42px; }
+.import-preview:empty { display: none; }
+.import-summary { font-size: 13.5px; font-weight: 600; margin-bottom: 8px; }
+.import-table { border: 1px solid var(--line-strong); border-radius: var(--radius-sm); max-height: 34dvh; overflow-y: auto; }
+.import-table table { width: 100%; border-collapse: collapse; font-size: 13.5px; table-layout: fixed; }
+.import-table th { position: sticky; top: 0; background: var(--surface-2); text-align: left; font-size: 11.5px; font-weight: 650; color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; padding: 7px 10px; }
+.import-table td { padding: 7px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+.import-table td:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.import-table .num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; width: 72px; }
+.import-table th:nth-child(3), .import-table td:nth-child(3) { width: 86px; }
+.badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-soft-ink); white-space: nowrap; }
+.badge--dupe { background: var(--surface-3); color: var(--ink-2); }
+.badge--bad { background: var(--danger-soft); color: var(--danger); }
+.badge--ex { background: var(--surface-2); color: var(--ink-2); margin-right: 4px; }
+
+/* ?debug in the URL outlines anything wider than the screen (see app.js). */
+.debug-wide { outline: 2px solid #e11 !important; outline-offset: -2px; }
+.debug-panel { position: fixed; left: 8px; right: 8px; bottom: 8px; z-index: 999; max-height: 40vh; overflow: auto; background: #111; color: #fff; font: 12px/1.4 ui-monospace, monospace; padding: 10px; border-radius: 10px; white-space: pre-wrap; }
 
 /* Small phones (iPhone SE, or larger iPhones in Display Zoom): tighten everything slightly. */
 @media (max-width: 374px) {

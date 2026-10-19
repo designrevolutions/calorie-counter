@@ -12,5 +12,5 @@
 
 - Static app with no build step: `index.html`, `styles.css`, `app.js`, plus `sw.js` for offline support. Open `index.html` directly, or serve the folder (`npx serve .`) for PWA features.
 - All data lives in `localStorage` under the key `tally:v1`. Keep `normalise()` in `app.js` backward-compatible when changing the data shape.
-- Bump `VERSION` in `sw.js` whenever shipped files change, so installed copies update.
-- Check layouts at 320–430px wide. There must be no horizontal page scroll, and form fields must stay ≥16px on touch screens (iOS zooms on smaller ones).
+- When shipped files change, bump `VERSION` in `sw.js` and the `?v=` query on `styles.css` and `app.js` in `index.html`, and update the matching entries in `ASSETS` in `sw.js`. Otherwise phones (iOS Chrome especially) keep serving stale files.
+- Check layouts at 320–430px wide. There must be no horizontal page scroll, and form fields must stay ≥16px on touch screens (iOS zooms on smaller ones). `?debug` in the URL outlines anything wider than the screen.

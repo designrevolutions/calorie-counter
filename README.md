@@ -46,7 +46,20 @@ Averages count only the days you logged, so a missed day doesn't drag the averag
 
 **Quick add** (⚡) logs a one-off number without creating a recipe. Tick the box to save it as a recipe as well.
 
-**Settings** (⚙) covers the daily goal, theme (system, light or dark), JSON backup and restore, CSV export of the log, sample recipes, and erase all data.
+**Settings** (⚙) covers the daily goal and theme (system, light or dark). Settings → **Import & export** (also linked as "Back it up" in the footer) keeps the data tools off the main screen:
+
+| | What it does |
+|---|---|
+| **Import recipes** | Reads a .csv, .tsv, .txt or .json file, or pasted text. It finds the item, calories, type and notes columns by their headers. Without headers, it reads lines like `Porridge, 340` or `Run - 350 exercise`. You see a preview first, with rows marked new, already saved or skipped. You choose whether rows without a type count as food or exercise, and whether duplicates are skipped, have their calories updated, or are added again. |
+| **Export recipes (.csv)** | `type,item,calories,notes`, UTF-8 so Excel opens it cleanly. The file imports straight back here or on another device. |
+| **Copy recipes** | Tab-separated text on the clipboard, ready to paste into a spreadsheet or message. |
+| **Export every entry (.csv)** | The full food log, one row per item. |
+| **Export daily totals (.csv)** | One row per day: food, exercise, net, goal, and whether you were within goal. |
+| **Download backup (.json)** | Everything. Shows when you last backed up. |
+| **Restore or merge a backup** | **Merge** adds only the recipes and log entries that aren't already here, which is handy for combining a phone and a laptop. **Replace** swaps everything for the backup. |
+| Sample data / Erase all | Sample recipes and exercises, or wipe everything. |
+
+**Troubleshooting width on a phone:** open the app with `?debug` on the end of the URL. Anything wider than the screen gets a red outline, and a panel shows the viewport details.
 
 **Keyboard shortcuts:** <kbd>/</kbd> search (then <kbd>Enter</kbd> adds the top match), <kbd>n</kbd> new recipes, <kbd>q</kbd> quick add, <kbd>r</kbd> reports, <kbd>←</kbd>/<kbd>→</kbd> previous/next day.
 
