@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Tally — Calorie Counter</title>
+  <meta name="description" content="A fast, private calorie counter. Log your regular recipes in one tap. Everything stays on your device.">
+  <meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#121311" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    // Apply the saved theme before first paint to avoid a flash.
+    try {
+      var s = JSON.parse(localStorage.getItem('tally:v1') || '{}');
+      var t = s.settings && s.settings.theme;
+      if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#recipes">Skip to recipes</a>
+
+  <div class="app">
+    <!-- ============ TOP HALF: today ============ -->
+    <section class="panel panel--today" aria-labelledby="day-label">
+      <header class="topbar">
+        <div class="brand" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="28" height="28"><use href="#logo"/></svg>
+        </div>
+        <nav class="daynav" aria-label="Choose day">
+          <button class="icon-btn" id="prev-day" aria-label="Previous day">
+            <svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>
+          </button>
+          <h1 class="daynav__label" id="day-label">Today</h1>
+          <button class="icon-btn" id="next-day" aria-label="Next day">
+            <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+        </nav>
+        <div class="topbar__end">
+          <button class="chip" id="go-today" hidden>Today</button>
+          <button class="icon-btn" id="open-settings" aria-label="Settings">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="summary">
+        <div class="ring" id="ring" role="img" aria-label="">
+          <svg viewBox="0 0 200 200" aria-hidden="true">
+            <circle class="ring__track" cx="100" cy="100" r="86"/>
+            <circle class="ring__fill" id="ring-fill" cx="100" cy="100" r="86"/>
+            <circle class="ring__over" id="ring-over" cx="100" cy="100" r="86"/>
+          </svg>
+          <div class="ring__center" aria-hidden="true">
+            <span class="ring__value" id="remaining-value">0</span>
+            <span class="ring__caption" id="remaining-caption">left</span>
+          </div>
+          <span class="ring__pop" id="ring-pop" aria-hidden="true"></span>
+        </div>
+
+        <dl class="stats">
+          <div class="stat">
+            <dt>Eaten</dt>
+            <dd><span id="eaten-value">0</span> <small>kcal</small></dd>
+          </div>
+          <div class="stat">
+            <dt>Goal</dt>
+            <dd><button class="link-btn" id="edit-goal"><span id="goal-value">2,000</span> <small>kcal</small></button></dd>
+          </div>
+          <div class="stat">
+            <dt>7-day avg</dt>
+            <dd><span id="avg-value">—</span> <small>kcal</small></dd>
+          </div>
+        </dl>
+      </div>
+
+      <figure class="week" aria-labelledby="week-caption">
+        <figcaption class="sr-only" id="week-caption">Calories for the last 7 days. Select a day to view it.</figcaption>
+        <div class="week__plot" id="week-plot"></div>
+      </figure>
+
+      <div class="log-head">
+        <h2 class="section-title">Food log</h2>
+        <button class="btn btn--ghost btn--sm" id="open-quick-add">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>
+          Quick add
+        </button>
+      </div>
+      <div id="log" class="log" aria-live="off"></div>
+      <p class="hint hint--gesture" id="gesture-hint">Tip: press and hold an item, then swipe to remove it.</p>
+    </section>
+
+    <!-- ============ BOTTOM HALF: recipes ============ -->
+    <section class="panel panel--recipes" id="recipes" aria-labelledby="recipes-title">
+      <div class="recipes-head">
+        <div>
+          <h2 class="section-title" id="recipes-title">My recipes</h2>
+          <p class="subtle" id="recipe-count"></p>
+        </div>
+        <button class="btn btn--primary" id="open-new-recipes">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          New recipes
+        </button>
+      </div>
+
+      <div class="meal-picker" role="radiogroup" aria-label="Add to meal" id="meal-picker"></div>
+
+      <div class="toolbar">
+        <label class="search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <span class="sr-only">Search recipes</span>
+          <input type="search" id="recipe-search" placeholder="Search recipes" autocomplete="off">
+          <kbd aria-hidden="true">/</kbd>
+        </label>
+        <label class="select">
+          <span class="sr-only">Sort recipes</span>
+          <select id="recipe-sort">
+            <option value="frequent">Most used</option>
+            <option value="recent">Recently used</option>
+            <option value="az">A–Z</option>
+            <option value="low">Lowest kcal</option>
+            <option value="high">Highest kcal</option>
+          </select>
+        </label>
+      </div>
+
+      <ul class="recipes" id="recipe-list"></ul>
+    </section>
+
+    <footer class="foot">
+      <p>Your data is stored only in this browser. <button class="link-btn" id="footer-backup">Back it up</button></p>
+    </footer>
+  </div>
+
+  <!-- ============ Dialog: new recipes ============ -->
+  <dialog class="sheet sheet--wide" id="dlg-new" aria-labelledby="dlg-new-title">
+    <form method="dialog" class="sheet__inner" id="new-form" novalidate>
+      <header class="sheet__head">
+        <h2 id="dlg-new-title">New recipes</h2>
+        <button class="icon-btn" type="button" data-close aria-label="Close">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+
+      <div class="segmented" role="radiogroup" aria-label="How to save these rows">
+        <label><input type="radio" name="mode" value="separate" checked><span>Each row is a recipe</span></label>
+        <label><input type="radio" name="mode" value="combine"><span>Combine into one recipe</span></label>
+      </div>
+
+      <div class="field" id="combine-name-field" hidden>
+        <label for="combine-name">Recipe name</label>
+        <input id="combine-name" type="text" placeholder="e.g. Sunday roast" autocomplete="off">
+      </div>
+
+      <div class="grid" role="table" aria-label="Recipe rows">
+        <div class="grid__head" role="row">
+          <span role="columnheader" id="col-item">Item</span>
+          <span role="columnheader" id="col-kcal">Calories</span>
+          <span role="columnheader"><span class="sr-only">Remove</span></span>
+        </div>
+        <div id="grid-body"></div>
+      </div>
+
+      <div class="grid__actions">
+        <button type="button" class="btn btn--ghost btn--sm" id="add-row">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          Add row
+        </button>
+        <span class="grid__total" id="grid-total"></span>
+      </div>
+      <p class="hint">First line of an item is its name; extra lines become notes. <strong>Paste</strong> rows straight from a spreadsheet, or lines like <code>Porridge, 320</code>.</p>
+
+      <footer class="sheet__foot">
+        <button class="btn btn--ghost" type="button" data-close>Cancel</button>
+        <button class="btn btn--primary" id="save-new" value="save">Save</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- ============ Dialog: edit recipe ============ -->
+  <dialog class="sheet" id="dlg-edit" aria-labelledby="dlg-edit-title">
+    <form method="dialog" class="sheet__inner" id="edit-form" novalidate>
+      <header class="sheet__head">
+        <h2 id="dlg-edit-title" tabindex="-1" autofocus>Edit recipe</h2>
+        <button class="icon-btn" type="button" data-close aria-label="Close">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+      <div class="field">
+        <label for="edit-text">Item</label>
+        <textarea id="edit-text" rows="3" required></textarea>
+        <p class="hint">First line is the name. Extra lines are notes.</p>
+      </div>
+      <div class="field">
+        <label for="edit-kcal">Calories</label>
+        <div class="input-suffix"><input id="edit-kcal" type="number" inputmode="numeric" min="0" max="20000" step="1" required><span>kcal</span></div>
+      </div>
+      <footer class="sheet__foot">
+        <button type="button" class="btn btn--danger-ghost" id="delete-recipe">Delete</button>
+        <span class="spacer"></span>
+        <button class="btn btn--ghost" type="button" data-close>Cancel</button>
+        <button class="btn btn--primary" value="save">Save</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- ============ Dialog: log entry ============ -->
+  <dialog class="sheet" id="dlg-entry" aria-labelledby="dlg-entry-title">
+    <form method="dialog" class="sheet__inner" id="entry-form" novalidate>
+      <header class="sheet__head">
+        <h2 id="dlg-entry-title" tabindex="-1" autofocus>Entry</h2>
+        <button class="icon-btn" type="button" data-close aria-label="Close">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+      <div class="field">
+        <span class="label" id="servings-label">Servings</span>
+        <div class="stepper" role="group" aria-labelledby="servings-label">
+          <button type="button" class="icon-btn icon-btn--filled" id="serv-minus" aria-label="Fewer servings"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+          <output id="serv-value" aria-live="polite">1</output>
+          <button type="button" class="icon-btn icon-btn--filled" id="serv-plus" aria-label="More servings"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+        </div>
+        <p class="entry-total" id="entry-total"></p>
+      </div>
+      <div class="field">
+        <span class="label">Meal</span>
+        <div class="meal-picker meal-picker--compact" role="radiogroup" aria-label="Meal" id="entry-meal"></div>
+      </div>
+      <footer class="sheet__foot">
+        <button type="button" class="btn btn--danger-ghost" id="delete-entry">Remove</button>
+        <span class="spacer"></span>
+        <button class="btn btn--primary" value="save">Done</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- ============ Dialog: quick add ============ -->
+  <dialog class="sheet" id="dlg-quick" aria-labelledby="dlg-quick-title">
+    <form method="dialog" class="sheet__inner" id="quick-form" novalidate>
+      <header class="sheet__head">
+        <h2 id="dlg-quick-title">Quick add</h2>
+        <button class="icon-btn" type="button" data-close aria-label="Close">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+      <p class="subtle">Log a one-off without creating a recipe.</p>
+      <div class="field">
+        <label for="quick-kcal">Calories</label>
+        <div class="input-suffix input-suffix--lg"><input id="quick-kcal" type="number" inputmode="numeric" min="1" max="20000" step="1" required placeholder="0"><span>kcal</span></div>
+      </div>
+      <div class="field">
+        <label for="quick-name">Label <span class="subtle">(optional)</span></label>
+        <input id="quick-name" type="text" placeholder="Coffee with a friend" autocomplete="off">
+      </div>
+      <div class="field">
+        <span class="label">Meal</span>
+        <div class="meal-picker meal-picker--compact" role="radiogroup" aria-label="Meal" id="quick-meal"></div>
+      </div>
+      <label class="check"><input type="checkbox" id="quick-save"> Also save to my recipes</label>
+      <footer class="sheet__foot">
+        <button class="btn btn--ghost" type="button" data-close>Cancel</button>
+        <button class="btn btn--primary" value="save">Log it</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- ============ Dialog: settings ============ -->
+  <dialog class="sheet" id="dlg-settings" aria-labelledby="dlg-settings-title">
+    <form method="dialog" class="sheet__inner" id="settings-form" novalidate>
+      <header class="sheet__head">
+        <h2 id="dlg-settings-title" tabindex="-1" autofocus>Settings</h2>
+        <button class="icon-btn" type="button" data-close aria-label="Close">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+
+      <div class="field">
+        <label for="goal-input">Daily calorie goal</label>
+        <div class="input-suffix"><input id="goal-input" type="number" inputmode="numeric" min="500" max="10000" step="10"><span>kcal</span></div>
+        <div class="presets" id="goal-presets">
+          <button type="button" class="chip" data-goal="1500">1,500</button>
+          <button type="button" class="chip" data-goal="1800">1,800</button>
+          <button type="button" class="chip" data-goal="2000">2,000</button>
+          <button type="button" class="chip" data-goal="2500">2,500</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="label">Appearance</span>
+        <div class="segmented" role="radiogroup" aria-label="Theme">
+          <label><input type="radio" name="theme" value="system"><span>System</span></label>
+          <label><input type="radio" name="theme" value="light"><span>Light</span></label>
+          <label><input type="radio" name="theme" value="dark"><span>Dark</span></label>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="label">Your data</span>
+        <p class="hint">Everything lives in this browser's local storage. Clearing site data will erase it, so export a backup now and then.</p>
+        <div class="stack">
+          <button type="button" class="btn btn--ghost btn--block" id="export-json">Download backup (.json)</button>
+          <button type="button" class="btn btn--ghost btn--block" id="export-csv">Export food log (.csv)</button>
+          <label class="btn btn--ghost btn--block file-btn">
+            Restore from backup…
+            <input type="file" id="import-json" accept="application/json,.json">
+          </label>
+          <button type="button" class="btn btn--ghost btn--block" id="load-samples">Add sample recipes</button>
+          <button type="button" class="btn btn--danger-ghost btn--block" id="erase-all">Erase all data</button>
+        </div>
+      </div>
+
+      <footer class="sheet__foot">
+        <span class="subtle" id="storage-usage"></span>
+        <span class="spacer"></span>
+        <button class="btn btn--primary" value="save">Done</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- ============ Toast + live region ============ -->
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden>
+    <span id="toast-msg"></span>
+    <button class="toast__action" id="toast-action" hidden>Undo</button>
+  </div>
+  <div class="sr-only" aria-live="polite" id="announcer"></div>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="logo" viewBox="0 0 32 32">
+      <rect width="32" height="32" rx="9" fill="var(--accent)"/>
+      <path d="M16 7.5a8.5 8.5 0 1 1-8.5 8.5" fill="none" stroke="var(--accent-ink)" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="16" cy="16" r="2.6" fill="var(--accent-ink)"/>
+    </symbol>
+  </svg>
+
+  <script src="app.js"></script>
+</body>
+</html>
