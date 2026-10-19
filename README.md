@@ -15,12 +15,24 @@ Pick one of these:
 
 ## Using it
 
-| Top half: today | Bottom half: my recipes |
+| Top half: today | Bottom half: my recipes and exercises |
 |---|---|
-| Ring showing calories **left** (or **over**) against your daily goal | Your saved recipes, with search and sort (most used, recent, A–Z, kcal) |
-| Eaten / goal / 7-day average | **Add to** chips (Breakfast, Lunch, Dinner, Snacks) pick the meal, defaulting to the time of day |
-| 7-day bar strip with a goal line; tap a bar to view that day | **+** logs a recipe instantly, with an animated count, a "+320" pop and an undo toast |
-| Food log grouped by meal, with subtotals | Tap a recipe's name to edit or delete it |
+| Ring showing calories **left** (or **over**): goal − food + exercise | **Food / Exercise** tabs, each with search and sort (most used, recent, A–Z, kcal) |
+| Food, exercise and goal for the day | **Add to** chips (Breakfast, Lunch, Dinner, Snacks) pick the meal, defaulting to the time of day |
+| 7-day bar strip of net calories, labelled with the actual dates, with a goal line; tap a bar to view that day | **+** logs an item instantly, with an animated count, a "+320" pop and an undo toast |
+| Log grouped by meal with subtotals, plus an **Exercise** group shown as negative | Tap a name to edit or delete it |
+
+**Exercise** works like food. You save the activities you do often, with the calories each one burns, and logging one *subtracts* those calories from the day's count. The calculation is net = food − exercise, the same one MyFitnessPal uses. Quick add has an "Exercise" option for one-off sessions. Tapping a logged exercise lets you scale it, for example ×2 for a double session.
+
+**Reports** (the bar-chart icon, or "See reports") show weekly (Monday to Sunday) or monthly stats. Use ‹ › to move between periods. Each report shows:
+- average net calories per day, compared with the previous period
+- how many logged days were within goal
+- total food and exercise for the period
+- a bar chart of net calories per day (tap a bar to open that day)
+- your top foods and top exercise
+- a breakdown of food calories by meal
+
+Averages count only the days you logged, so a missed day doesn't drag the average down.
 
 **Removing items:** press and hold a logged item, then swipe it left or right. Every removal can be undone. Other ways to remove: hover and click the bin (desktop), tap the item and choose **Remove**, or focus it and press <kbd>Delete</kbd>.
 
@@ -36,7 +48,7 @@ Pick one of these:
 
 **Settings** (⚙) covers the daily goal, theme (system, light or dark), JSON backup and restore, CSV export of the log, sample recipes, and erase all data.
 
-**Keyboard shortcuts:** <kbd>/</kbd> search (then <kbd>Enter</kbd> adds the top match), <kbd>n</kbd> new recipes, <kbd>q</kbd> quick add, <kbd>←</kbd>/<kbd>→</kbd> previous/next day.
+**Keyboard shortcuts:** <kbd>/</kbd> search (then <kbd>Enter</kbd> adds the top match), <kbd>n</kbd> new recipes, <kbd>q</kbd> quick add, <kbd>r</kbd> reports, <kbd>←</kbd>/<kbd>→</kbd> previous/next day.
 
 ## Decisions
 
@@ -56,6 +68,8 @@ Pick one of these:
 
 **Design.** The palette is a warm paper neutral with one green accent. Amber is used only for "over goal", and always comes with a text label so it's never colour alone. The dark theme has its own colour values rather than an automatic inversion. Numbers use tabular figures so they don't shift as they count up. Dialogs are bottom sheets on phones and centred dialogs on desktop. Motion is respected: `prefers-reduced-motion` turns animations off. Native `<dialog>` handles focus trapping and <kbd>Esc</kbd>. Forced-colours mode is supported.
 
+**Phones.** Form fields are at least 16px on touch screens. iOS Safari zooms in on any smaller field when you tap it, and that zoom leaves the page able to scroll sideways. List grids use `minmax(0, 1fr)` so that long names shorten with "…" instead of pushing past the edge. Screens narrower than 375px (iPhone SE, or Display Zoom) get slightly tighter spacing.
+
 **Day handling.** Days are keyed by local date (`YYYY-MM-DD`). If the app is left open past midnight, it rolls over to the new day. You can browse and log on past days, but not future ones.
 
 ## Research and what I added
@@ -68,13 +82,14 @@ I looked at how MyFitnessPal, Lose It! and Cronometer handle the core loop, and 
 | Four meal slots: breakfast, lunch, dinner, snacks | MyFitnessPal | Meal chips that default to the time of day; log grouped by meal |
 | Quick add a bare calorie number | MyFitnessPal, Cronometer (a common request) | ⚡ Quick add, optionally saved as a recipe |
 | Saved meals reused as one entry | MyFitnessPal, Lose It! | "Combine into one recipe" mode in the grid |
-| Daily budget plus weekly reports | Lose It! | Daily goal plus a 7-day strip and average |
+| Daily budget plus weekly reports | Lose It! | Daily goal, a 7-day strip, and week/month reports |
+| Exercise adds calories back to the day | MyFitnessPal, Lose It! | Exercise tab; net = food − exercise |
 | Common complaint: busy, cluttered UI | Lose It! reviews | One screen, one accent colour, details tucked into sheets |
 
 Things I deliberately **left out of v1**:
 - A food database or barcode scanning, which would need a backend or API.
 - Macros, which would make recipe entry slower.
-- Exercise calories and weight tracking, which are good v2 candidates.
+- Weight tracking, which is a good next candidate. Exercise and reports have since been added.
 - Accounts and sync, which are out of scope with localStorage only.
 
 ## Files

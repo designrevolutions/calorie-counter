@@ -41,6 +41,9 @@
         </nav>
         <div class="topbar__end">
           <button class="chip" id="go-today" hidden>Today</button>
+          <button class="icon-btn" id="open-reports" aria-label="Reports">
+            <svg viewBox="0 0 24 24"><path d="M5 20V11M12 20V5M19 20v-6"/></svg>
+          </button>
           <button class="icon-btn" id="open-settings" aria-label="Settings">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
           </button>
@@ -63,22 +66,26 @@
 
         <dl class="stats">
           <div class="stat">
-            <dt>Eaten</dt>
+            <dt>Food</dt>
             <dd><span id="eaten-value">0</span> <small>kcal</small></dd>
+          </div>
+          <div class="stat stat--burn">
+            <dt>Exercise</dt>
+            <dd><span id="burned-value">0</span> <small>kcal</small></dd>
           </div>
           <div class="stat">
             <dt>Goal</dt>
             <dd><button class="link-btn" id="edit-goal"><span id="goal-value">2,000</span> <small>kcal</small></button></dd>
           </div>
-          <div class="stat">
-            <dt>7-day avg</dt>
-            <dd><span id="avg-value">—</span> <small>kcal</small></dd>
-          </div>
         </dl>
       </div>
 
+      <div class="week-head">
+        <span class="week-head__title" id="week-title">Last 7 days</span>
+        <button class="link-btn week-head__link" id="open-reports-2">See reports</button>
+      </div>
       <figure class="week" aria-labelledby="week-caption">
-        <figcaption class="sr-only" id="week-caption">Calories for the last 7 days. Select a day to view it.</figcaption>
+        <figcaption class="sr-only" id="week-caption">Net calories for the last 7 days. Select a day to view it.</figcaption>
         <div class="week__plot" id="week-plot"></div>
       </figure>
 
@@ -95,6 +102,17 @@
 
     <!-- ============ BOTTOM HALF: recipes ============ -->
     <section class="panel panel--recipes" id="recipes" aria-labelledby="recipes-title">
+      <div class="tabs" role="tablist" aria-label="Saved items" id="kind-tabs">
+        <button role="tab" id="tab-food" data-kind="food" aria-selected="true" aria-controls="recipe-list">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v8M4 3v5a3 3 0 0 0 6 0V3M7 11v10M17 21V3c-2.5 1-4 3.5-4 7v4h4"/></svg>
+          Food
+        </button>
+        <button role="tab" id="tab-exercise" data-kind="exercise" aria-selected="false" aria-controls="recipe-list" tabindex="-1">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5v11M17.5 6.5v11M3 9.5v5M21 9.5v5M6.5 12h11"/></svg>
+          Exercise
+        </button>
+      </div>
+
       <div class="recipes-head">
         <div>
           <h2 class="section-title" id="recipes-title">My recipes</h2>
@@ -102,7 +120,7 @@
         </div>
         <button class="btn btn--primary" id="open-new-recipes">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          New recipes
+          <span id="new-label">New recipes</span>
         </button>
       </div>
 
@@ -145,7 +163,7 @@
         </button>
       </header>
 
-      <div class="segmented" role="radiogroup" aria-label="How to save these rows">
+      <div class="segmented" role="radiogroup" aria-label="How to save these rows" id="mode-switch">
         <label><input type="radio" name="mode" value="separate" checked><span>Each row is a recipe</span></label>
         <label><input type="radio" name="mode" value="combine"><span>Combine into one recipe</span></label>
       </div>
@@ -195,7 +213,7 @@
         <p class="hint">First line is the name. Extra lines are notes.</p>
       </div>
       <div class="field">
-        <label for="edit-kcal">Calories</label>
+        <label for="edit-kcal" id="edit-kcal-label">Calories</label>
         <div class="input-suffix"><input id="edit-kcal" type="number" inputmode="numeric" min="0" max="20000" step="1" required><span>kcal</span></div>
       </div>
       <footer class="sheet__foot">
@@ -225,7 +243,7 @@
         </div>
         <p class="entry-total" id="entry-total"></p>
       </div>
-      <div class="field">
+      <div class="field" id="entry-meal-field">
         <span class="label">Meal</span>
         <div class="meal-picker meal-picker--compact" role="radiogroup" aria-label="Meal" id="entry-meal"></div>
       </div>
@@ -246,7 +264,7 @@
           <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
       </header>
-      <p class="subtle">Log a one-off without creating a recipe.</p>
+      <p class="subtle">Log a one-off food or exercise without saving it first.</p>
       <div class="field">
         <label for="quick-kcal">Calories</label>
         <div class="input-suffix input-suffix--lg"><input id="quick-kcal" type="number" inputmode="numeric" min="1" max="20000" step="1" required placeholder="0"><span>kcal</span></div>
@@ -256,10 +274,10 @@
         <input id="quick-name" type="text" placeholder="Coffee with a friend" autocomplete="off">
       </div>
       <div class="field">
-        <span class="label">Meal</span>
-        <div class="meal-picker meal-picker--compact" role="radiogroup" aria-label="Meal" id="quick-meal"></div>
+        <span class="label">Add to</span>
+        <div class="meal-picker meal-picker--compact" role="radiogroup" aria-label="Add to" id="quick-meal"></div>
       </div>
-      <label class="check"><input type="checkbox" id="quick-save"> Also save to my recipes</label>
+      <label class="check"><input type="checkbox" id="quick-save"> <span id="quick-save-label">Also save to my recipes</span></label>
       <footer class="sheet__foot">
         <button class="btn btn--ghost" type="button" data-close>Cancel</button>
         <button class="btn btn--primary" value="save">Log it</button>
@@ -318,6 +336,28 @@
         <button class="btn btn--primary" value="save">Done</button>
       </footer>
     </form>
+  </dialog>
+
+  <!-- ============ Dialog: reports ============ -->
+  <dialog class="sheet sheet--wide" id="dlg-reports" aria-labelledby="dlg-reports-title">
+    <div class="sheet__inner">
+      <header class="sheet__head">
+        <h2 id="dlg-reports-title" tabindex="-1" autofocus>Reports</h2>
+        <button class="icon-btn" type="button" data-close aria-label="Close">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+      <div class="segmented" role="radiogroup" aria-label="Report period" id="report-period">
+        <label><input type="radio" name="period" value="week" checked><span>Week</span></label>
+        <label><input type="radio" name="period" value="month"><span>Month</span></label>
+      </div>
+      <div class="report-nav">
+        <button class="icon-btn" type="button" id="report-prev" aria-label="Previous period"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <h3 class="report-nav__label" id="report-label" aria-live="polite"></h3>
+        <button class="icon-btn" type="button" id="report-next" aria-label="Next period"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+      </div>
+      <div id="report-body" class="report"></div>
+    </div>
   </dialog>
 
   <!-- ============ Toast + live region ============ -->
