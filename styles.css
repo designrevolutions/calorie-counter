@@ -307,6 +307,10 @@ small { font-size: .72em; color: var(--ink-3); font-weight: 500; }
 .subtle { color: var(--ink-3); font-size: 13.5px; }
 .hint { color: var(--ink-3); font-size: 12.5px; line-height: 1.5; }
 .hint--gesture { margin-top: 10px; text-align: center; }
+.quick-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 4px; }
+.quick-row--end { margin: 14px 0 0; }
+.quick-row .btn { height: auto; min-height: 40px; padding: 6px 10px; white-space: normal; line-height: 1.2; text-align: center; min-width: 0; }
+.quick-row .btn svg { flex: none; }
 @media (hover: hover) and (pointer: fine) { .hint--gesture { display: none; } }
 
 .log { display: grid; }
@@ -332,12 +336,11 @@ small { font-size: .72em; color: var(--ink-3); font-weight: 500; }
 .entry__fg {
   position: relative; display: flex; align-items: center; gap: 12px;
   min-height: 56px; padding: 8px 8px 8px 14px; background: var(--surface-2);
-  border-radius: var(--radius-sm); touch-action: pan-y; user-select: none; -webkit-user-select: none;
+  border-radius: var(--radius-sm); touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
   transition: transform .3s var(--ease), box-shadow .2s, background .2s;
   cursor: pointer;
 }
 .entry__fg:hover { background: var(--surface-3); }
-.entry.is-held .entry__fg { box-shadow: var(--shadow); transform: scale(.985); background: var(--surface); }
 .entry.is-dragging .entry__fg { transition: none; box-shadow: var(--shadow); background: var(--surface); }
 .entry.is-new .entry__fg { animation: entry-in .5s var(--ease-spring); }
 .entry.is-new .entry__fg::after {

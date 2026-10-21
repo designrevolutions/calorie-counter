@@ -307,6 +307,7 @@
 
   function renderLog() {
     const entries = entriesFor(ui.date);
+    $('#quick-row-end').hidden = !entries.length;
     if (!entries.length) {
       const isToday = ui.date === ui.today;
       els.log.innerHTML = `<div class="empty">
@@ -569,75 +570,85 @@
   }
 
   /* =========================================================
-     Gestures: press-and-hold, then swipe to remove
+     Gestures: swipe an entry sideways to remove it
+     Touch uses touch events so a horizontal drag can be claimed with
+     preventDefault: iOS cancels pointer streams once it decides to scroll.
+     Mouse and pen use pointer events.
      ========================================================= */
-  const HOLD_MS = 220;
-  let gesture = null;
+  const SWIPE_LOCK = 10; // px of travel before deciding between swipe and scroll
+  let swipe = null;
   let suppressClick = false;
 
-  els.log.addEventListener('pointerdown', (e) => {
-    const fg = e.target.closest('.entry__fg');
-    if (!fg || e.target.closest('.entry__del') || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  function swipeStart(target, x, y) {
+    const fg = target.closest('.entry__fg');
+    if (!fg || target.closest('.entry__del')) return null;
     const li = fg.parentElement;
-    gesture = { li, fg, id: li.dataset.id, x: e.clientX, y: e.clientY, dx: 0, held: false, pointerId: e.pointerId, t: 0, lastX: e.clientX, v: 0 };
-    gesture.timer = setTimeout(() => {
-      if (!gesture) return;
-      gesture.held = true;
-      li.classList.add('is-held');
-      try { fg.setPointerCapture(gesture.pointerId); } catch (_) {}
-      if (navigator.vibrate) navigator.vibrate(12);
-    }, HOLD_MS);
-  });
-
-  els.log.addEventListener('pointermove', (e) => {
-    if (!gesture || e.pointerId !== gesture.pointerId) return;
-    const dx = e.clientX - gesture.x;
-    const dy = e.clientY - gesture.y;
-    if (!gesture.held) {
-      if (Math.hypot(dx, dy) > 8) cancelGesture(); // moved before the hold: treat as a scroll/tap
-      return;
+    swipe = { li, fg, id: li.dataset.id, x, y, dx: 0, axis: null, t: performance.now(), lastX: x, v: 0 };
+    return swipe;
+  }
+  /** Track the drag; returns true while it is a horizontal swipe (so scrolling should be blocked). */
+  function swipeMove(x, y) {
+    if (!swipe) return false;
+    const dx = x - swipe.x;
+    const dy = y - swipe.y;
+    if (!swipe.axis) {
+      if (Math.abs(dx) < SWIPE_LOCK && Math.abs(dy) < SWIPE_LOCK) return false;
+      swipe.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+      if (swipe.axis === 'y') { swipe = null; return false; } // a scroll, not a swipe
+      swipe.li.classList.add('is-dragging');
     }
-    e.preventDefault();
     const now = performance.now();
-    if (gesture.t) gesture.v = (e.clientX - gesture.lastX) / Math.max(1, now - gesture.t);
-    gesture.t = now;
-    gesture.lastX = e.clientX;
-    gesture.dx = dx;
-    gesture.li.classList.add('is-dragging');
-    gesture.fg.style.transform = `translateX(${dx}px)`;
-  });
-
-  function endGesture(e) {
-    if (!gesture || (e && e.pointerId !== gesture.pointerId)) return;
-    const g = gesture;
-    clearTimeout(g.timer);
-    gesture = null;
-    if (!g.held) return;
+    swipe.v = (x - swipe.lastX) / Math.max(1, now - swipe.t);
+    swipe.t = now;
+    swipe.lastX = x;
+    swipe.dx = dx;
+    swipe.fg.style.transform = `translateX(${dx}px)`;
+    return true;
+  }
+  function swipeEnd(cancelled) {
+    const s = swipe;
+    swipe = null;
+    if (!s || s.axis !== 'x') return;
     suppressClick = true;
-    setTimeout(() => (suppressClick = false), 60);
-    g.li.classList.remove('is-held');
-    const width = g.fg.offsetWidth;
-    const flung = Math.abs(g.dx) > width * 0.35 || (Math.abs(g.dx) > 50 && Math.abs(g.v) > 0.6);
-    if (e && e.type === 'pointerup' && flung) {
-      const dir = Math.sign(g.dx) || 1;
-      g.fg.style.transition = 'transform .2s ease-out';
-      g.fg.style.transform = `translateX(${dir * width * 1.1}px)`;
-      setTimeout(() => collapse(g.li, () => removeEntry(g.id)), 160);
+    setTimeout(() => (suppressClick = false), 80);
+    const width = s.fg.offsetWidth;
+    const flung = Math.abs(s.dx) > width * 0.35 || (Math.abs(s.dx) > 40 && Math.abs(s.v) > 0.5 && Math.sign(s.v) === Math.sign(s.dx));
+    if (!cancelled && flung) {
+      const dir = Math.sign(s.dx) || 1;
+      s.fg.style.transition = 'transform .18s ease-out';
+      s.fg.style.transform = `translateX(${dir * width * 1.1}px)`;
+      setTimeout(() => collapse(s.li, () => removeEntry(s.id)), 160);
     } else {
-      g.li.classList.remove('is-dragging');
-      g.fg.style.transform = '';
+      s.li.classList.remove('is-dragging');
+      s.fg.style.transform = '';
     }
   }
-  function cancelGesture() {
-    if (!gesture) return;
-    clearTimeout(gesture.timer);
-    gesture.li.classList.remove('is-held', 'is-dragging');
-    gesture.fg.style.transform = '';
-    gesture = null;
-  }
-  els.log.addEventListener('pointerup', endGesture);
-  els.log.addEventListener('pointercancel', (e) => { if (gesture && gesture.held) endGesture(e); else cancelGesture(); });
-  els.log.addEventListener('contextmenu', (e) => { if (e.target.closest('.entry__fg')) e.preventDefault(); });
+
+  els.log.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) { swipeEnd(true); return; }
+    swipeStart(e.target, e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: true });
+  els.log.addEventListener('touchmove', (e) => {
+    if (!swipe || e.touches.length !== 1) return;
+    if (swipeMove(e.touches[0].clientX, e.touches[0].clientY) && e.cancelable) e.preventDefault();
+  }, { passive: false });
+  els.log.addEventListener('touchend', () => swipeEnd(false));
+  els.log.addEventListener('touchcancel', () => swipeEnd(true));
+
+  els.log.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch' || e.button !== 0) return;
+    const s = swipeStart(e.target, e.clientX, e.clientY);
+    if (s) s.pointerId = e.pointerId;
+  });
+  els.log.addEventListener('pointermove', (e) => {
+    if (!swipe || swipe.pointerId !== e.pointerId) return;
+    const locked = swipe.axis === 'x';
+    if (swipeMove(e.clientX, e.clientY) && !locked) {
+      try { swipe.fg.setPointerCapture(e.pointerId); } catch (_) {}
+    }
+  });
+  els.log.addEventListener('pointerup', (e) => { if (swipe && swipe.pointerId === e.pointerId) swipeEnd(false); });
+  els.log.addEventListener('pointercancel', (e) => { if (swipe && swipe.pointerId === e.pointerId) swipeEnd(true); });
 
   els.log.addEventListener('click', (e) => {
     if (suppressClick) { e.preventDefault(); e.stopPropagation(); return; }
@@ -1061,17 +1072,24 @@
   const quickSave = $('#quick-save');
   const quickMeal = $('#quick-meal');
   let quickMealValue = ui.meal;
+  let quickKind = 'food';
 
   function renderQuickMeal() {
-    renderMealPicker(quickMeal, quickMealValue, false, true);
-    $('#quick-save-label').textContent = quickMealValue === EXERCISE ? 'Also save to my exercises' : 'Also save to my recipes';
-    $('label[for="quick-kcal"]').textContent = quickMealValue === EXERCISE ? 'Calories burned' : 'Calories';
+    const burn = quickKind === EXERCISE;
+    $('#dlg-quick-title').textContent = burn ? 'Quick Add Exercise' : 'Quick Add Food';
+    $('#quick-intro').textContent = burn ? 'Log a one-off workout or activity without saving it first.' : 'Log a one-off food without saving it first.';
+    $('#quick-meal-field').hidden = burn;
+    if (!burn) renderMealPicker(quickMeal, quickMealValue, false);
+    quickName.placeholder = burn ? 'Evening walk' : 'Coffee with a friend';
+    $('#quick-save-label').textContent = burn ? 'Also save to my exercises' : 'Also save to my recipes';
+    $('label[for="quick-kcal"]').textContent = burn ? 'Calories burned' : 'Calories';
   }
-  function openQuickDialog() {
+  function openQuickDialog(kind = 'food') {
     quickKcal.value = '';
     quickName.value = '';
     quickSave.checked = false;
-    quickMealValue = ui.tab === EXERCISE ? EXERCISE : ui.meal;
+    quickKind = kind === EXERCISE ? EXERCISE : 'food';
+    quickMealValue = quickKind === EXERCISE ? EXERCISE : ui.meal;
     renderQuickMeal();
     openDialog(dlgQuick);
     quickKcal.focus();
@@ -1084,7 +1102,7 @@
     const kcal = parseKcal(quickKcal.value);
     if (!kcal) { quickKcal.focus(); toast('Enter the calories to log.'); return; }
     const name = quickName.value.trim();
-    if (quickSave.checked && !name) { quickName.focus(); toast('Add a label to save it as a recipe.'); return; }
+    if (quickSave.checked && !name) { quickName.focus(); toast(quickKind === EXERCISE ? 'Add a label to save it as an exercise.' : 'Add a label to save it as a recipe.'); return; }
     let recipeId = null;
     const burn = quickMealValue === EXERCISE;
     const kind = burn ? EXERCISE : 'food';
@@ -1189,7 +1207,7 @@
     });
     if (lines.length === 1) { toast('Nothing logged yet to export.'); return; }
     download(`tally-log-${dateKey()}.csv`, lines.join('\n'), 'text/csv');
-    toast('Food log exported');
+    toast('Food/exercise log exported');
   });
 
   /* ---------- Full backup: restore (replace) or merge ---------- */
@@ -1268,7 +1286,7 @@
   function renderDataStatus() {
     const t = state.settings.lastBackup;
     $('#last-backup').textContent = t ? `Everything: recipes, exercises, log and settings. Last backup ${ago(t)}.` : 'Everything: recipes, exercises, log and settings. No backup yet.';
-    $('#backup-status').textContent = t ? `Last backup ${ago(t)}` : 'Recipes, food log and backups. No backup yet.';
+    $('#backup-status').textContent = t ? `Last backup ${ago(t)}` : 'Recipes, food/exercise log and backups. No backup yet.';
     const bytes = new Blob([localStorage.getItem(STORAGE_KEY) || '']).size;
     const days = Object.keys(state.log).length;
     $('#storage-usage').textContent = `${state.recipes.length} saved items · ${days} day${days === 1 ? '' : 's'} logged · ${bytes < 1024 ? bytes + ' B' : (bytes / 1024).toFixed(1) + ' KB'} used`;
@@ -1703,7 +1721,7 @@
   $('#edit-goal').addEventListener('click', () => openSettings(true));
   $('#footer-backup').addEventListener('click', () => openData());
   $('#open-new-recipes').addEventListener('click', () => openNewDialog());
-  $('#open-quick-add').addEventListener('click', openQuickDialog);
+  $$('[data-quick]').forEach((b) => b.addEventListener('click', () => openQuickDialog(b.dataset.quick)));
 
   wireMealPicker(els.mealPicker, setMeal);
 
@@ -1743,7 +1761,8 @@
     if (typing) return;
     if (e.key === '/') { e.preventDefault(); els.search.focus(); }
     else if (e.key === 'n') { e.preventDefault(); openNewDialog(); }
-    else if (e.key === 'q') { e.preventDefault(); openQuickDialog(); }
+    else if (e.key === 'q') { e.preventDefault(); openQuickDialog('food'); }
+    else if (e.key === 'e') { e.preventDefault(); openQuickDialog(EXERCISE); }
     else if (e.key === 'r') { e.preventDefault(); openReports(); }
     else if (e.key === 'ArrowLeft' && !e.target.closest('[role="radiogroup"]')) setDate(addDays(ui.date, -1));
     else if (e.key === 'ArrowRight' && !e.target.closest('[role="radiogroup"]')) setDate(addDays(ui.date, 1));

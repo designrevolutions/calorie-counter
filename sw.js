@@ -1,6 +1,6 @@
 // Offline cache for the app shell. Bump VERSION (and the ?v= in index.html) when shipping changes.
-const VERSION = 'tally-v3';
-const ASSETS = ['./', 'index.html', 'styles.css?v=3', 'app.js?v=3', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-maskable.svg'];
+const VERSION = 'tally-v4';
+const ASSETS = ['./', 'index.html', 'styles.css?v=4', 'app.js?v=4', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-maskable.svg'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));

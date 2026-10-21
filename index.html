@@ -10,7 +10,7 @@
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon.svg">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=3">
+  <link rel="stylesheet" href="styles.css?v=4">
   <script>
     // iOS browsers (Safari, Chrome, Brave all use WebKit) auto-zoom into focused fields and can stay
     // zoomed, leaving the page scrollable sideways. maximum-scale stops that auto-zoom; iOS still
@@ -96,14 +96,30 @@
       </figure>
 
       <div class="log-head">
-        <h2 class="section-title">Food log</h2>
-        <button class="btn btn--ghost btn--sm" id="open-quick-add">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>
-          Quick add
+        <h2 class="section-title">Food/Exercise Log</h2>
+      </div>
+      <div class="quick-row">
+        <button class="btn btn--ghost btn--sm" data-quick="food">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v8M4 3v5a3 3 0 0 0 6 0V3M7 11v10M17 21V3c-2.5 1-4 3.5-4 7v4h4"/></svg>
+          Quick Add Food
+        </button>
+        <button class="btn btn--ghost btn--sm" data-quick="exercise">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5v11M17.5 6.5v11M3 9.5v5M21 9.5v5M6.5 12h11"/></svg>
+          Quick Add Exercise
         </button>
       </div>
       <div id="log" class="log" aria-live="off"></div>
-      <p class="hint hint--gesture" id="gesture-hint">Tip: press and hold an item, then swipe to remove it.</p>
+      <div class="quick-row quick-row--end" id="quick-row-end">
+        <button class="btn btn--ghost btn--sm" data-quick="food">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v8M4 3v5a3 3 0 0 0 6 0V3M7 11v10M17 21V3c-2.5 1-4 3.5-4 7v4h4"/></svg>
+          Quick Add Food
+        </button>
+        <button class="btn btn--ghost btn--sm" data-quick="exercise">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5v11M17.5 6.5v11M3 9.5v5M21 9.5v5M6.5 12h11"/></svg>
+          Quick Add Exercise
+        </button>
+      </div>
+      <p class="hint hint--gesture" id="gesture-hint">Tip: swipe an item left or right to remove it.</p>
     </section>
 
     <!-- ============ BOTTOM HALF: recipes ============ -->
@@ -265,12 +281,12 @@
   <dialog class="sheet" id="dlg-quick" aria-labelledby="dlg-quick-title">
     <form method="dialog" class="sheet__inner" id="quick-form" novalidate>
       <header class="sheet__head">
-        <h2 id="dlg-quick-title">Quick add</h2>
+        <h2 id="dlg-quick-title">Quick Add Food</h2>
         <button class="icon-btn" type="button" data-close aria-label="Close">
           <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
       </header>
-      <p class="subtle">Log a one-off food or exercise without saving it first.</p>
+      <p class="subtle" id="quick-intro">Log a one-off food without saving it first.</p>
       <div class="field">
         <label for="quick-kcal">Calories</label>
         <div class="input-suffix input-suffix--lg"><input id="quick-kcal" type="number" inputmode="numeric" min="1" max="20000" step="1" required placeholder="0"><span>kcal</span></div>
@@ -279,7 +295,7 @@
         <label for="quick-name">Label <span class="subtle">(optional)</span></label>
         <input id="quick-name" type="text" placeholder="Coffee with a friend" autocomplete="off">
       </div>
-      <div class="field">
+      <div class="field" id="quick-meal-field">
         <span class="label">Add to</span>
         <div class="meal-picker meal-picker--compact" role="radiogroup" aria-label="Add to" id="quick-meal"></div>
       </div>
@@ -325,7 +341,7 @@
         <span class="label">Your data</span>
         <button type="button" class="nav-row" id="open-data">
           <span class="nav-row__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg></span>
-          <span class="nav-row__text"><strong>Import &amp; export</strong><span id="backup-status">Recipes, food log and backups</span></span>
+          <span class="nav-row__text"><strong>Import &amp; export</strong><span id="backup-status">Recipes, food/exercise log and backups</span></span>
           <svg class="nav-row__chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
         </button>
       </div>
@@ -366,7 +382,7 @@
       </section>
 
       <section class="data-group" aria-labelledby="dg-log">
-        <h3 id="dg-log">Food log</h3>
+        <h3 id="dg-log">Food/Exercise Log</h3>
         <button type="button" class="data-row" id="export-csv">
           <strong>Export every entry (.csv)</strong><span>One row per item logged: date, meal, item, calories.</span>
         </button>
@@ -492,6 +508,6 @@
     </symbol>
   </svg>
 
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>
